@@ -4,7 +4,7 @@ Enterprise-grade real-time data pipeline for gaming events using Apache Kafka an
 
 ## 🎯 Overview
 
-This system processes real-time events from an 8Ball Pool game server through a complete data lakehouse architecture:
+This system processes real-time events from an game server through a complete data lakehouse architecture:
 
 - **Event Streaming**: Kafka-based real-time event ingestion with configurable rates
 - **Medallion Architecture**: Bronze → Silver → Gold layers using Delta Lake
@@ -113,7 +113,7 @@ This system processes real-time events from an 8Ball Pool game server through a 
 # One-command setup - fully automated!
 git clone <repository-url>
 cd gaming-event-processing
-./scripts/quickstart.sh
+sudo ./scripts/quickstart.sh
 ```
 
 **Duration**: ~3-4 minutes. The script automatically:
@@ -143,7 +143,7 @@ cd gaming-event-processing
 ## 📊 Event Types
 
 ### 1. Init Event
-Triggered when a player opens the @8ballpool app (first event of session).
+Triggered when a player opens the app (first event of session).
 
 **Schema**: [schemas/init.json](schemas/init.json)
 
