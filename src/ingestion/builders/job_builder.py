@@ -1,10 +1,19 @@
 """Builder pattern for BronzeIngestionJob construction.
 
+**DEPRECATED**: This builder is no longer used in the current architecture.
+The system now uses a unified bronze ingestion approach with direct instantiation
+of BronzeEventIngestion. This file is kept for backward compatibility only.
+
+For current usage, see:
+- src/ingestion/storage/bronze_writer.py (BronzeEventIngestion class)
+- src/ingestion/main.py (Direct instantiation example)
+
 Provides a fluent API for constructing BronzeIngestionJob instances with
 clear, readable configuration. Supports reading from BronzeIngestionConfig or
 building with custom parameters.
 """
 
+import warnings
 from typing import Optional
 
 from src.ingestion.core.config import BronzeIngestionConfig
@@ -17,6 +26,9 @@ logger = StructuredLogger.get_logger(__name__)
 
 class BronzeIngestionJobBuilder:
     """Fluent builder for constructing BronzeIngestionJob instances.
+    
+    **DEPRECATED**: Use BronzeEventIngestion with direct instantiation instead.
+    This builder is kept for backward compatibility only.
 
     Implements the Builder pattern to provide a clean, readable, and flexible API for
     constructing bronze ingestion jobs with complex configurations. Supports multiple

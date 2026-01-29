@@ -41,8 +41,9 @@ This system processes real-time events from an game server through a complete da
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                    BRONZE LAYER - RAW DATA INGESTION                         │
 │  ┌─────────────────────────────────────────────────────────────┐            │
-│  │   Spark Structured Streaming (3 Jobs)                       │            │
-│  │   - Multiplexed ingestion from all Kafka topics             │            │
+│  │   Unified Spark Structured Streaming Job                    │            │
+│  │   - Single job subscribes to all Kafka topics               │            │
+│  │   - Prevents Delta Lake concurrent write conflicts          │            │
 │  │   - Preserves raw Kafka metadata (topic, partition, offset) │            │
 │  │   - ACID writes to single Delta Lake table                  │            │
 │  └─────────────────────────────────────────────────────────────┘            │
@@ -51,7 +52,7 @@ This system processes real-time events from an game server through a complete da
 │  ┌─────────────────────────────────────────────────────────────┐            │
 │  │   Delta Lake: storage/bronze/events/                        │            │
 │  │   - All events in single multiplex table                    │            │
-│  │   - Checkpoint: storage/checkpoints/bronze_ingestion_*/     │            │
+│  │   - Checkpoint: storage/checkpoints/bronze_ingestion_unified│            │
 │  └─────────────────────────────────────────────────────────────┘            │
 └─────────┬───────────────────────────────────────────────────────────────────┘
           │

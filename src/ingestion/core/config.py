@@ -13,24 +13,24 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class BronzeIngestionConfig(BaseSettings):
     """Bronze layer ingestion configuration settings.
     
-    Generic configuration that accepts topic name as a parameter, enabling multiple
-    ingestion job instances for different Kafka topics. Each instance consumes from
-    a specific topic and writes to a shared bronze Delta table with topic-specific
-    checkpoints.
+    Configuration for unified bronze ingestion that subscribes to multiple Kafka topics
+    simultaneously. This prevents concurrent write conflicts that occur when multiple
+    separate Spark streaming jobs try to write to the same Delta table.
     
-    The kafka_topic parameter must be set via the KAFKA_TOPIC environment variable
-    for each job instance.
+    All configured topics are consumed in a single streaming job, which ensures proper
+    Delta Lake transaction coordination and prevents checksum errors in the transaction log.
     
     Attributes:
         kafka_bootstrap_servers: Kafka broker connection string.
-        kafka_topic: Kafka topic to consume from (required via environment variable).
+        kafka_topics: Comma-separated list of Kafka topics to consume from.
+        kafka_topic: Legacy single topic support (deprecated, use kafka_topics).
         kafka_starting_offsets: Starting offset strategy for consumption.
         storage_base_path: Base directory for all storage paths.
         storage_bronze_path: Delta Lake path for bronze table (shared across topics).
-        checkpoint_bronze: Base checkpoint path (suffixed with topic name per instance).
+        checkpoint_bronze: Checkpoint path for the unified ingestion job.
         streaming_trigger_interval: Micro-batch processing interval.
         streaming_max_offsets_per_trigger: Maximum offsets per micro-batch.
-        spark_app_name: Base Spark application name (suffixed with topic name).
+        spark_app_name: Spark application name for the unified ingestion job.
         spark_log_level: Logging level for Spark operations.
         log_level: Application logging level.
     """
@@ -39,8 +39,13 @@ class BronzeIngestionConfig(BaseSettings):
         default="kafka:9092",
         description="Kafka bootstrap servers"
     )
+    kafka_topics: str = Field(
+        default="init_events,match_events,purchase_events",
+        description="Comma-separated list of Kafka topics to consume from"
+    )
     kafka_topic: str = Field(
-        description="Kafka topic to consume from (REQUIRED - must be set per job instance)"
+        default="",
+        description="Legacy single topic support (deprecated, use kafka_topics)"
     )
     kafka_starting_offsets: str = Field(
         default="latest",
@@ -57,8 +62,8 @@ class BronzeIngestionConfig(BaseSettings):
     )
     
     checkpoint_bronze: str = Field(
-        default="/opt/bitnami/spark/storage/checkpoints/bronze_ingestion",
-        description="Checkpoint location for bronze ingestion (will be suffixed with topic name)"
+        default="/opt/bitnami/spark/storage/checkpoints/bronze_ingestion_unified",
+        description="Checkpoint location for unified bronze ingestion"
     )
     
     streaming_trigger_interval: str = Field(
@@ -71,8 +76,8 @@ class BronzeIngestionConfig(BaseSettings):
     )
     
     spark_app_name: str = Field(
-        default="bronze-event-ingestion",
-        description="Spark application name (will be suffixed with topic name)"
+        default="bronze-event-ingestion-unified",
+        description="Spark application name for unified ingestion"
     )
     spark_log_level: str = Field(
         default="WARN",
@@ -84,30 +89,43 @@ class BronzeIngestionConfig(BaseSettings):
         description="Application log level"
     )
     
-    def get_checkpoint_path(self) -> str:
-        """Get checkpoint path with topic-specific suffix.
+    def get_topics_list(self) -> list[str]:
+        """Get list of Kafka topics to subscribe to.
         
-        Creates a unique checkpoint path for each topic by appending the topic name
-        to the base checkpoint path. This enables multiple ingestion instances to
-        maintain independent streaming state.
+        Returns topics from kafka_topics (comma-separated) or falls back to
+        kafka_topic for backward compatibility.
         
         Returns:
-            Checkpoint path string with topic suffix (e.g., '.../bronze_ingestion_init-events').
+            List of Kafka topic names.
         """
-        topic_suffix = str(self.kafka_topic).replace("_", "-")
-        return f"{self.checkpoint_bronze}_{topic_suffix}"
+        # Support legacy single topic configuration
+        if self.kafka_topic and not self.kafka_topics:
+            return [self.kafka_topic]
+        
+        # Parse comma-separated topics list
+        return [topic.strip() for topic in self.kafka_topics.split(",") if topic.strip()]
+    
+    def get_checkpoint_path(self) -> str:
+        """Get checkpoint path for unified ingestion.
+        
+        Returns the unified checkpoint path for the single ingestion job
+        that subscribes to multiple topics.
+        
+        Returns:
+            Checkpoint path string for unified ingestion.
+        """
+        return f"{self.checkpoint_bronze}_unified"
     
     def get_app_name(self) -> str:
-        """Get Spark application name with topic suffix.
+        """Get Spark application name for unified ingestion.
         
-        Creates a descriptive application name by appending the topic name to the
-        base app name, making it easier to identify and monitor specific ingestion
-        jobs in Spark UI.
+        Returns a descriptive application name for the unified ingestion job
+        that processes multiple Kafka topics.
         
         Returns:
-            Application name string with topic suffix (e.g., 'bronze-event-ingestion-init_events').
+            Application name string for unified ingestion.
         """
-        return f"{self.spark_app_name}-{self.kafka_topic}"
+        return f"{self.spark_app_name}-unified"
     
     model_config = SettingsConfigDict(
         env_file=".env",

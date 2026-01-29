@@ -74,14 +74,14 @@ class EventProcessor:
         applies preprocessing for complex event structures.
         
         Args:
-            bronze_df: Streaming DataFrame from bronze table with JSON in value column.
+            bronze_df: Streaming DataFrame from bronze table with JSON in event_json column.
             event_config: Configuration specifying event filter and optional preprocessing.
             
         Returns:
             Parsed and filtered DataFrame with expanded JSON fields and original timestamps.
         """
         parsed_df = (bronze_df
-            .withColumn("event_data", from_json(col("value"), self.schema_provider.get_event_schema()))
+            .withColumn("event_data", from_json(col("event_json"), self.schema_provider.get_event_schema()))
             .select("event_data.*", "ingestion_timestamp", "kafka_timestamp")
             .filter(col("event-type") == event_config.event_filter))
         

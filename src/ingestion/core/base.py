@@ -1,10 +1,21 @@
 """
 Abstract Base Class for Bronze Ingestion Jobs.
 
+**DEPRECATED**: These classes are no longer used in the current architecture.
+The system now uses a unified bronze ingestion approach with the BronzeEventIngestion
+class which subscribes to multiple Kafka topics in a single streaming job.
+
+This file is kept for backward compatibility only.
+
+For current usage, see:
+- src/ingestion/storage/bronze_writer.py (BronzeEventIngestion class)
+- src/ingestion/main.py (Direct instantiation example)
+
 Uses Template Method design pattern to provide a generic ingestion framework
 that can be configured for different Kafka topics while maintaining common logic.
 """
 
+import warnings
 from abc import ABC, abstractmethod
 from typing import Optional
 from pyspark.sql import SparkSession, DataFrame
@@ -19,6 +30,8 @@ logger = StructuredLogger.get_logger(__name__)
 
 class BronzeIngestionJob(ABC):
     """Abstract base class for bronze layer ingestion jobs.
+    
+    **DEPRECATED**: Use BronzeEventIngestion class instead for unified multi-topic ingestion.
     
     Implements the Template Method design pattern to provide a generic ingestion framework
     with a well-defined algorithm that can be configured for different Kafka topics while

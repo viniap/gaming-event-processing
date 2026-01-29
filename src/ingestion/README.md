@@ -1,6 +1,6 @@
 # Bronze Layer Ingestion
 
-Real-time streaming ingestion from Kafka topics to Bronze Delta Lake layer using Spark Structured Streaming. Implements the Template Method pattern for extensible ingestion workflows.
+Real-time streaming ingestion from multiple Kafka topics to a unified Bronze Delta Lake layer using Spark Structured Streaming. Uses a single streaming job to prevent concurrent write conflicts.
 
 ## Architecture
 
@@ -18,16 +18,16 @@ Real-time streaming ingestion from Kafka topics to Bronze Delta Lake layer using
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│              Spark Structured Streaming (3 Jobs)                 │
+│          Unified Spark Structured Streaming Job                  │
 │                                                                   │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │  BronzeIngestionJob (Template Method Pattern)              │ │
+│  │  BronzeEventIngestion (Single Job, Multiple Topics)        │ │
 │  │                                                             │ │
-│  │  1. read_from_kafka()        ──▶ Read stream from topic   │ │
+│  │  1. read_from_kafka()        ──▶ Subscribe to all topics  │ │
 │  │  2. transform_to_bronze()    ──▶ Add ingestion metadata   │ │
 │  │  3. write_to_bronze()        ──▶ Write to Delta Lake      │ │
 │  │                                                             │ │
-│  │  Template workflow ensures consistent behavior             │ │
+│  │  Prevents concurrent write conflicts to same Delta table  │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────┘
                               │
@@ -38,66 +38,60 @@ Real-time streaming ingestion from Kafka topics to Bronze Delta Lake layer using
 │  storage/bronze/events/  (Multiplexed)                           │
 │  ┌────────────────────────────────────────────────────────────┐ │
 │  │  Schema:                                                    │ │
-│  │  - key             : binary   (Kafka key)                  │ │
-│  │  - value           : binary   (Kafka message, JSON)        │ │
-│  │  - topic           : string   (Source topic name)          │ │
-│  │  - partition       : int      (Kafka partition)            │ │
-│  │  - offset          : long     (Kafka offset)               │ │
-│  │  - timestamp       : timestamp (Kafka timestamp)           │ │
-│  │  - timestampType   : int      (0=CreateTime, 1=LogAppend)  │ │
-│  │  - kafka_timestamp : timestamp (Original timestamp)        │ │
-│  │  - ingestion_timestamp: timestamp (When ingested)          │ │
+│  │  - event_json          : string    (Kafka message, JSON)   │ │
+│  │  - ingestion_timestamp : timestamp (When ingested)         │ │
+│  │  - kafka_timestamp     : timestamp (Original Kafka time)   │ │
+│  │  - kafka_topic         : string    (Source topic name)     │ │
+│  │  - kafka_partition     : int       (Kafka partition)       │ │
+│  │  - kafka_offset        : long      (Kafka offset)          │ │
 │  └────────────────────────────────────────────────────────────┘ │
 │                                                                   │
-│  Benefits of single multiplex table:                             │
-│  ✓ Simplified architecture                                       │
+│  Benefits of unified single-job ingestion:                       │
+│  ✓ Prevents Delta Lake concurrent write conflicts               │
+│  ✓ Simplified architecture with one streaming job                │
 │  ✓ Single source of truth for raw data                           │
 │  ✓ Easy replay and reprocessing                                  │
-│  ✓ Topic filtering in downstream processing                      │
+│  ✓ Proper Delta transaction coordination                         │
 └──────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                  Checkpoints (Per Topic)                          │
-│  storage/checkpoints/bronze_ingestion_init-events/               │
-│  storage/checkpoints/bronze_ingestion_match-events/              │
-│  storage/checkpoints/bronze_ingestion_purchase-events/           │
+│                  Unified Checkpoint Location                      │
+│  storage/checkpoints/bronze_ingestion_unified/                   │
 │                                                                   │
+│  Single checkpoint for the unified streaming job                 │
 │  Enables exactly-once semantics and failure recovery             │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-## Design Patterns
+## Design Approach
 
-### Template Method Pattern
+### Direct Instantiation Pattern
 
-**Base Class**: `BronzeIngestionJob` (abstract)
+**Main Class**: `BronzeEventIngestion`
 
-Defines the ingestion workflow skeleton:
+The bronze ingestion uses a straightforward approach with direct instantiation:
 
 ```python
-def run(self) -> None:
-    """Template method defining the workflow."""
-    self._setup_spark()
-    df = self.read_from_kafka()
-    df = self.transform_to_bronze(df)
-    query = self.write_to_bronze(df)
-    self._wait_for_termination(query)
+from src.ingestion.storage.bronze_writer import BronzeEventIngestion
+from src.common.spark_utils import SparkSessionFactory
+
+# Create Spark session
+spark = SparkSessionFactory.create_streaming_session(app_name="bronze-ingestion")
+
+# Create and run ingestion
+ingestion = BronzeEventIngestion(spark, config)
+ingestion.run()
 ```
 
-**Concrete Class**: `ConfigurableBronzeIngestion`
+### Unified Multi-Topic Subscription
 
-Implements specific behavior for each step while the workflow remains fixed.
-
-### Factory Pattern
-
-**Builder**: `BronzeIngestionJobBuilder`
-
-Creates job instances with proper configuration:
+The ingestion subscribes to multiple Kafka topics in a single streaming job to prevent Delta Lake concurrent write conflicts:
 
 ```python
-builder = BronzeIngestionJobBuilder()
-job = builder.with_config(config).build()
+# Single job subscribes to all topics
+topics = "init_events,match_events,purchase_events"
+df = spark.readStream.format("kafka").option("subscribe", topics).load()
 ```
 
 ### Dependency Injection
@@ -123,57 +117,24 @@ Pydantic-based configuration with environment variable support.
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `kafka_bootstrap_servers` | `kafka:9092` | Kafka broker addresses |
-| `kafka_topic` | **Required** | Topic to consume (set via env) |
-| `kafka_starting_offsets` | `earliest` | Where to start reading |
+| `kafka_topics` | `init_events,match_events,purchase_events` | Comma-separated topics to consume |
+| `kafka_topic` | `` | Legacy single topic (for backward compatibility) |
+| `kafka_starting_offsets` | `latest` | Where to start reading |
 | `storage_base_path` | `/opt/bitnami/spark/storage` | Base storage path |
 | `storage_bronze_path` | `{base}/bronze/events` | Bronze table location |
-| `checkpoint_bronze` | `{base}/checkpoints/bronze_ingestion_{topic}` | Checkpoint directory |
+| `checkpoint_bronze` | `{base}/checkpoints/bronze_ingestion` | Base checkpoint directory |
 | `streaming_trigger_interval` | `10 seconds` | Micro-batch interval |
 | `streaming_max_offsets_per_trigger` | `10000` | Max records per batch |
-| `spark_app_name` | `bronze-ingestion-{topic}` | Spark application name |
+| `spark_app_name` | `bronze-event-ingestion` | Base Spark application name |
 | `spark_log_level` | `WARN` | Spark logging level |
 | `log_level` | `INFO` | Application logging level |
 
-### 2. Base Ingestion Job (`core/base.py`)
+**Configuration Methods**:
+- `get_topics_list()`: Returns list of topics to subscribe to
+- `get_checkpoint_path()`: Returns unified checkpoint path with `_unified` suffix
+- `get_app_name()`: Returns application name with `_unified` suffix
 
-**Abstract Class**: `BronzeIngestionJob`
-
-Defines the contract for all bronze ingestion jobs:
-
-**Abstract Methods**:
-- `read_from_kafka() -> DataFrame`: Read streaming data from Kafka
-- `transform_to_bronze(df) -> DataFrame`: Add bronze layer metadata
-- `write_to_bronze(df) -> StreamingQuery`: Write to Delta Lake
-
-**Template Method**:
-- `run()`: Orchestrates the complete workflow
-
-**Concrete Class**: `ConfigurableBronzeIngestion`
-
-Standard implementation reading from configured Kafka topic and writing to bronze Delta table.
-
-### 3. Job Builder (`builders/job_builder.py`)
-
-**Class**: `BronzeIngestionJobBuilder`
-
-Factory for creating configured ingestion jobs:
-
-```python
-builder = BronzeIngestionJobBuilder()
-job = (builder
-    .with_config(config)
-    .with_spark_factory(SparkSessionFactory)
-    .with_logger(logger)
-    .build())
-```
-
-**Methods**:
-- `with_config(config)`: Set configuration
-- `with_spark_factory(factory)`: Set Spark session factory
-- `with_logger(logger)`: Set logger instance
-- `build()`: Create job instance
-
-### 4. Bronze Writer (`storage/bronze_writer.py`)
+### 2. Bronze Writer (`storage/bronze_writer.py`)
 
 **Class**: `BronzeEventIngestion`
 
@@ -183,14 +144,14 @@ Implements the ingestion logic:
 
 `read_from_kafka()`: 
 - Creates streaming DataFrame from Kafka
-- Subscribes to single topic
+- Subscribes to multiple topics simultaneously
 - Reads from configured starting offset
-- Returns raw Kafka schema
+- Returns raw Kafka schema with all topics' data
 
 `transform_to_bronze()`:
-- Renames `timestamp` to `kafka_timestamp` (avoids conflict)
+- Casts Kafka `value` to string as `event_json`
 - Adds `ingestion_timestamp` with current timestamp
-- Preserves all Kafka metadata (key, value, topic, partition, offset)
+- Preserves all Kafka metadata (topic, partition, offset, timestamp)
 - Returns transformed DataFrame
 
 `write_to_bronze()`:
@@ -200,40 +161,39 @@ Implements the ingestion logic:
 - Configures trigger interval for micro-batches
 - Returns StreamingQuery for monitoring
 
-### 5. Main Entry Point (`main.py`)
+### 3. Main Entry Point (`main.py`)
 
 **Function**: `main()`
 
 Application entry point that:
 1. Loads configuration from environment
-2. Validates required settings (KAFKA_TOPIC)
+2. Validates required settings (defaults to all event topics)
 3. Initializes structured logger
-4. Creates job via builder
-5. Executes ingestion workflow
-6. Handles graceful shutdown
+4. Creates Spark session
+5. Creates `BronzeEventIngestion` instance directly
+6. Executes ingestion workflow
+7. Handles graceful shutdown
 
-## Running Ingestion Jobs
+## Running the Unified Ingestion Job
 
 ### Using Quickstart (Recommended)
 
-All three ingestion jobs start automatically:
+The unified ingestion job starts automatically:
 
 ```bash
 ./scripts/quickstart.sh
 ```
 
 This starts:
-- `bronze-ingestion-init` - Ingests from init_events
-- `bronze-ingestion-match` - Ingests from match_events  
-- `bronze-ingestion-purchase` - Ingests from purchase_events
+- `bronze-ingestion-unified` - Ingests from all topics (init_events, match_events, purchase_events)
 
 ### Manual Execution via Docker
 
 ```bash
-# Init events
+# Unified ingestion (all topics)
 docker exec -it --user 1000:1000 \
   -e PYTHONPATH=/opt/bitnami/spark/jobs \
-  -e KAFKA_TOPIC=init_events \
+  -e KAFKA_TOPICS=init_events,match_events,purchase_events \
   spark-master \
   /opt/bitnami/spark/bin/spark-submit \
     --master spark://spark-master:7077 \

@@ -199,10 +199,11 @@ services:
       - ../src:/src/src
       - ../schemas:/src/schemas
 
-  # Bronze Ingestion - Init Events
-  bronze-ingestion-init:
+  # Bronze Ingestion - Unified ingestion for all event types
+  # This single service subscribes to all Kafka topics to prevent concurrent write conflicts
+  bronze-ingestion-unified:
     image: spark-local:3.5.0
-    container_name: bronze-ingestion-init
+    container_name: bronze-ingestion-unified
     user: root
     command: >
       spark-submit
@@ -211,65 +212,7 @@ services:
       /opt/bitnami/spark/jobs/src/ingestion/main.py
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - KAFKA_TOPIC=init_events
-      - PYTHONPATH=/opt/bitnami/spark/jobs
-      - DELTA_AUTO_COMPACT=false
-    volumes:
-      - ${APP_ROOT_PATH}:/opt/bitnami/spark/jobs
-      - ${APP_STORAGE_PATH}:/opt/bitnami/spark/storage
-    depends_on:
-      - spark-master
-      - spark-worker-1
-      - spark-worker-2
-      - spark-worker-3
-      - kafka
-      - event-producer
-    networks:
-      - spark-network
-    restart: unless-stopped
-
-  # Bronze Ingestion - Match Events
-  bronze-ingestion-match:
-    image: spark-local:3.5.0
-    container_name: bronze-ingestion-match
-    user: root
-    command: >
-      spark-submit
-      --master spark://spark-master:7077
-      --deploy-mode client
-      /opt/bitnami/spark/jobs/src/ingestion/main.py
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - KAFKA_TOPIC=match_events
-      - PYTHONPATH=/opt/bitnami/spark/jobs
-      - DELTA_AUTO_COMPACT=false
-    volumes:
-      - ${APP_ROOT_PATH}:/opt/bitnami/spark/jobs
-      - ${APP_STORAGE_PATH}:/opt/bitnami/spark/storage
-    depends_on:
-      - spark-master
-      - spark-worker-1
-      - spark-worker-2
-      - spark-worker-3
-      - kafka
-      - event-producer
-    networks:
-      - spark-network
-    restart: unless-stopped
-
-  # Bronze Ingestion - Purchase Events
-  bronze-ingestion-purchase:
-    image: spark-local:3.5.0
-    container_name: bronze-ingestion-purchase
-    user: root
-    command: >
-      spark-submit
-      --master spark://spark-master:7077
-      --deploy-mode client
-      /opt/bitnami/spark/jobs/src/ingestion/main.py
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - KAFKA_TOPIC=purchase_events
+      - KAFKA_TOPICS=init_events,match_events,purchase_events
       - PYTHONPATH=/opt/bitnami/spark/jobs
       - DELTA_AUTO_COMPACT=false
     volumes:
@@ -305,9 +248,7 @@ services:
       - spark-worker-1
       - spark-worker-2
       - spark-worker-3
-      - bronze-ingestion-init
-      - bronze-ingestion-match
-      - bronze-ingestion-purchase
+      - bronze-ingestion-unified
     networks:
       - spark-network
     restart: unless-stopped
