@@ -1,0 +1,27 @@
+# Dockerfile for Event Producer
+FROM python:3.11-slim
+
+# Set working directory
+WORKDIR /src
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements from build directory
+COPY build/requirements.txt .
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY src/ /src/src/
+COPY schemas/ /src/schemas/
+
+# Set Python path
+ENV PYTHONPATH=/src
+
+# Run the producer
+CMD ["python", "-m", "src.producer.main"]
