@@ -109,19 +109,12 @@ sleep 60
 echo "✅ Events should be flowing to Kafka topics"
 echo ""
 
-# Step 3: Start bronze ingestion jobs (sequentially)
-echo "🚀 Step 3/5: Starting bronze ingestion jobs..."
+# Step 3: Start bronze ingestion job
+echo "🚀 Step 3/5: Starting bronze ingestion job..."
 cd build
-echo "   Starting init ingestion..."
-docker compose up -d bronze-ingestion-init
-sleep 15
-echo "   Starting match ingestion..."
-docker compose up -d bronze-ingestion-match
-sleep 15
-echo "   Starting purchase ingestion..."
-docker compose up -d bronze-ingestion-purchase
+docker compose up -d bronze-ingestion-unified
 cd ..
-echo "✅ Bronze ingestion jobs started"
+echo "✅ Bronze ingestion job started"
 echo ""
 
 # Wait for bronze tables to be populated

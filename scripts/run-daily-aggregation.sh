@@ -39,9 +39,6 @@ docker compose run --rm \
     spark-submit \
     --master spark://spark-master:7077 \
     --deploy-mode client \
-    --packages io.delta:delta-spark_2.12:3.2.0 \
-    --conf spark.sql.extensions=io.delta.sql.DeltaSparkSessionExtension \
-    --conf spark.sql.catalog.spark_catalog=org.apache.spark.sql.delta.catalog.DeltaCatalog \
     /opt/bitnami/spark/jobs/src/aggregation/batch/main.py
 
 if [ $? -eq 0 ]; then

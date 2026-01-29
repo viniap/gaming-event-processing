@@ -62,10 +62,10 @@ def query_bronze_table(spark: SparkSession, config: VisualizerConfig):
         print(f"\n📊 Total Records: {df.count():,}")
         
         print("\n📈 Events by Topic:")
-        df.groupBy("topic").count().orderBy("topic").show(truncate=False)
+        df.groupBy("kafka_topic").count().orderBy("kafka_topic").show(truncate=False)
         
         print(f"\n🔍 Sample Records (showing {config.num_rows}):")
-        df.select("topic", "kafka_timestamp", "ingestion_timestamp").show(config.num_rows, truncate=False)
+        df.select("kafka_topic", "kafka_timestamp", "ingestion_timestamp").show(config.num_rows, truncate=False)
         
     except Exception as e:
         print(f"❌ Error reading bronze table: {e}")
