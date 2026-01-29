@@ -1,0 +1,11 @@
+event_type: "match"
+transformations:
+  - field: "user_a_platform"
+    type: "uppercase"
+    params:
+      source_field: "user_a_platform_orig"
+    
+  - field: "user_b_platform"
+    type: "uppercase"
+    params:
+      source_field: "user_b_platform_orig"

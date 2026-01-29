@@ -1,0 +1,21 @@
+event_type: "init"
+transformations:
+  - field: "platform"
+    type: "uppercase"
+    
+  - field: "country_name"
+    type: "mapping"
+    params:
+      source_field: "country"
+      mapping:
+        "US": "United States"
+        "UK": "United Kingdom"
+        "BR": "Brazil"
+        "JP": "Japan"
+        "DE": "Germany"
+        "FR": "France"
+        "IN": "India"
+        "CN": "China"
+        "CA": "Canada"
+        "AU": "Australia"
+      default: "Unknown"

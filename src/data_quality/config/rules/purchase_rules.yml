@@ -1,0 +1,18 @@
+event_type: "in-app-purchase"
+transformations:
+  - field: "product_name"
+    type: "mapping"
+    params:
+      source_field: "product-id"
+      mapping:
+        "PROD001": "Coin Pack Small"
+        "PROD002": "Coin Pack Medium"
+        "PROD003": "Coin Pack Large"
+        "PROD004": "Premium Pass"
+        "PROD005": "VIP Membership"
+        "PROD006": "Coin Pack Mega"
+        "PROD007": "Coin Pack Ultimate"
+        "PROD008": "Starter Pack"
+        "PROD009": "Boost Pack"
+        "PROD010": "Special Offer"
+      default: "Unknown Product"

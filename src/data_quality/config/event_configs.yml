@@ -1,0 +1,32 @@
+# Event Type Configuration
+# 
+# This file defines all event types processed by the Silver Data Quality Pipeline.
+# Adding a new event type is as simple as adding a new entry here and creating
+# the corresponding transformation rules file.
+#
+# Fields:
+#   event_type: Display name for logging and monitoring
+#   event_filter: Value to filter in the 'event-type' column from bronze table
+#   silver_table: Name of the silver table (will be combined with base path)
+#   transform_key: Key to lookup transformation rules (matches rules filename)
+#   preprocessing: Optional preprocessing function name (must be registered in code)
+
+events:
+  - event_type: "init"
+    event_filter: "init"
+    silver_table: "init"
+    transform_key: "init"
+    description: "User initialization events when app opens"
+  
+  - event_type: "match"
+    event_filter: "match"
+    silver_table: "match"
+    transform_key: "match"
+    preprocessing: "flatten_match_fields"
+    description: "Match events with nested player postmatch information"
+  
+  - event_type: "purchase"
+    event_filter: "in-app-purchase"
+    silver_table: "purchase"
+    transform_key: "in-app-purchase"
+    description: "In-app purchase events"
