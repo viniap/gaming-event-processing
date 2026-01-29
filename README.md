@@ -112,9 +112,10 @@ This system processes real-time events from an game server through a complete da
 
 ```bash
 # One-command setup - fully automated!
+# Use sudo if you have any permission issues with Docker
 git clone <repository-url>
 cd gaming-event-processing
-sudo ./scripts/quickstart.sh
+./scripts/quickstart.sh
 ```
 
 **Duration**: ~3-4 minutes. The script automatically:
