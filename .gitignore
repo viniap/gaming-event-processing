@@ -221,3 +221,5 @@ __marimo__/
 
 # Github
 .github/
+
+!src/ingestion/storage
